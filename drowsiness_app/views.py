@@ -21,6 +21,11 @@ def detect_drowsiness(request):
     pygame.mixer.init()
     pygame.mixer.music.load("static/music.wav")
 
+    # Add these global declarations at the beginning of the views.py file or within the alarm function
+    alarm_status = False
+    alarm_status2 = False
+    saying = False
+    
     def alarm(msg):
         global alarm_status
         global alarm_status2
@@ -83,29 +88,16 @@ def detect_drowsiness(request):
         return distance
 
 
-    # Parses command-line arguments for webcam index, EAR threshold,
-    # consecutive frames for drowsiness detection, and yawn threshold.
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-w", "--webcam", type=int, default=0, help="index of webcam on system")
-    ap.add_argument(
-        "--ear-thresh",
-        type=float,
-        default=0.3,
-        help="eye aspect ratio threshold for drowsiness detection",
-    )
-    ap.add_argument(
-        "--ear-frames",
-        type=int,
-        default=30,
-        help="consecutive frames for drowsiness detection",
-    )
-    ap.add_argument("--yawn-thresh", type=int, default=20, help="yawn threshold for alert")
-    args = vars(ap.parse_args())
+    # Replace command-line argument parsing with getting parameters from the request
+    webcam_index = int(request.GET.get('webcam', 0))
+    ear_thresh = float(request.GET.get('ear_thresh', 0.3))
+    ear_frames = int(request.GET.get('ear_frames', 30))
+    yawn_thresh = int(request.GET.get('yawn_thresh', 20))
 
-    # Initializes various parameters and flags for the drowsiness and yawn detection.
-    EYE_AR_THRESH = args["ear_thresh"]
-    EYE_AR_CONSEC_FRAMES = args["ear_frames"]
-    YAWN_THRESH = args["yawn_thresh"]
+    # Use parameters in the code instead of argparse
+    EYE_AR_THRESH = ear_thresh
+    EYE_AR_CONSEC_FRAMES = ear_frames
+    YAWN_THRESH = yawn_thresh
     alarm_status = False
     alarm_status2 = False
     saying = False
@@ -121,7 +113,7 @@ def detect_drowsiness(request):
 
 
     print("-> Starting Video Stream")
-    vs = VideoStream(src=args["webcam"]).start()
+    vs = VideoStream(src=webcam_index).start()
     # vs= VideoStream(usePiCamera=True).start()       //For Raspberry Pi
     time.sleep(1.0)
 
