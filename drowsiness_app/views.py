@@ -1,6 +1,5 @@
 # drowsiness_detection/views.py
 import os
-from django.shortcuts import render
 from django.http import JsonResponse
 from threading import Thread
 import time
@@ -13,10 +12,52 @@ import numpy as np
 import dlib
 import pygame.mixer
 
+from django.shortcuts import render, redirect
+from django.contrib.auth import login, authenticate
+from .forms import CustomUserCreationForm
+
+
+
+def register(request):
+    if request.method == "POST":
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect(
+                "login"
+            )  # Redirect to login for simplicity, update as needed
+    else:
+        form = CustomUserCreationForm()
+
+    return render(request, "registration/register.html", {"form": form})
+
+
+def custom_login(request):
+    if request.method == "POST":
+        # Your existing login logic here
+        username = request.POST["username"]
+        password = request.POST["password"]
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            login(request, user)
+
+            # Redirect users based on their role
+            if user.user_role == "admin":
+                return redirect("admin_dashboard")
+            elif user.user_role == "driver":
+                return redirect("driver_dashboard")
+            elif user.user_role == "car_owner":
+                return redirect("car_owner_dashboard")
+
+    return render(request, "registration/login.html")
+
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 alarm_status = False
 alarm_status2 = False
 saying = False
+
 
 def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
     global alarm_status
@@ -24,7 +65,7 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
     global saying
 
     pygame.mixer.init()
-    pygame.mixer.music.load(os.path.join(BASE_DIR, 'static/music.wav'))
+    pygame.mixer.music.load(os.path.join(BASE_DIR, "static/music.wav"))
 
     def alarm(msg):
         global alarm_status
@@ -57,7 +98,6 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
 
         return ear
 
-
     def final_ear(shape):
         (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
         (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
@@ -70,7 +110,6 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
 
         ear = (leftEAR + rightEAR) / 2.0
         return (ear, leftEye, rightEye)
-
 
     def lip_distance(shape):
         top_lip = shape[50:53]
@@ -198,23 +237,24 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
     cv2.destroyAllWindows()
     vs.stop()
 
+
 # View function
 def detect_drowsiness(request):
     # Replace command-line argument parsing with getting parameters from the request
-    webcam_index = int(request.GET.get('webcam', 0))
-    ear_thresh = float(request.GET.get('ear_thresh', 0.3))
-    ear_frames = int(request.GET.get('ear_frames', 30))
-    yawn_thresh = int(request.GET.get('yawn_thresh', 20))
+    webcam_index = int(request.GET.get("webcam", 0))
+    ear_thresh = float(request.GET.get("ear_thresh", 0.3))
+    ear_frames = int(request.GET.get("ear_frames", 30))
+    yawn_thresh = int(request.GET.get("yawn_thresh", 20))
 
     # Use parameters in the code instead of argparse
     drowsiness_thread = Thread(
-        target=drowsiness_detection, args=(webcam_index, ear_thresh, ear_frames, yawn_thresh)
+        target=drowsiness_detection,
+        args=(webcam_index, ear_thresh, ear_frames, yawn_thresh),
     )
     drowsiness_thread.daemon = True
     drowsiness_thread.start()
 
-    return JsonResponse({'status': 'success'})
-
+    return JsonResponse({"status": "success"})
 
 
 # # http://127.0.0.1:8000/detect_drowsiness/?webcam=0&ear_thresh=0.3&ear_frames=30&yawn_thresh=20
