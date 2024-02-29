@@ -1,31 +1,31 @@
 # drowsiness_detection/views.py
+import os
 from django.shortcuts import render
 from django.http import JsonResponse
-from scipy.spatial import distance as dist
+from threading import Thread
+import time
+import cv2
+import imutils
 from imutils.video import VideoStream
 from imutils import face_utils
-from threading import Thread
+from scipy.spatial import distance as dist
 import numpy as np
-import argparse
-import imutils
-import time
 import dlib
-import cv2
-import os
 import pygame.mixer
-from datetime import datetime
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+alarm_status = False
+alarm_status2 = False
+saying = False
 
-def detect_drowsiness(request):
-    # Paste the entire drowsiness detection code here
+def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
+    global alarm_status
+    global alarm_status2
+    global saying
+
     pygame.mixer.init()
-    pygame.mixer.music.load("static/music.wav")
+    pygame.mixer.music.load(os.path.join(BASE_DIR, 'static/music.wav'))
 
-    # Add these global declarations at the beginning of the views.py file or within the alarm function
-    alarm_status = False
-    alarm_status2 = False
-    saying = False
-    
     def alarm(msg):
         global alarm_status
         global alarm_status2
@@ -41,13 +41,11 @@ def detect_drowsiness(request):
         if alarm_status2:
             print("Playing audio alert...")
             pygame.mixer.music.play()
-
             print("call")
             saying = True
             s = 'espeak "' + msg + '"'
             os.system(s)
             saying = False
-
 
     def eye_aspect_ratio(eye):
         A = dist.euclidean(eye[1], eye[5])
@@ -87,43 +85,21 @@ def detect_drowsiness(request):
         distance = abs(top_mean[1] - low_mean[1])
         return distance
 
-
-    # Replace command-line argument parsing with getting parameters from the request
-    webcam_index = int(request.GET.get('webcam', 0))
-    ear_thresh = float(request.GET.get('ear_thresh', 0.3))
-    ear_frames = int(request.GET.get('ear_frames', 30))
-    yawn_thresh = int(request.GET.get('yawn_thresh', 20))
-
-    # Use parameters in the code instead of argparse
-    EYE_AR_THRESH = ear_thresh
-    EYE_AR_CONSEC_FRAMES = ear_frames
-    YAWN_THRESH = yawn_thresh
-    alarm_status = False
-    alarm_status2 = False
-    saying = False
-    COUNTER = 0
-
-
     print("-> Loading the predictor and detector...")
-    # detector = dlib.get_frontal_face_detector()
-    detector = cv2.CascadeClassifier(
-        "static/haarcascade_frontalface_default.xml"
-    )  # Faster but less accurate
+    detector = cv2.CascadeClassifier("static/haarcascade_frontalface_default.xml")
     predictor = dlib.shape_predictor("static/shape_predictor_68_face_landmarks.dat")
-
 
     print("-> Starting Video Stream")
     vs = VideoStream(src=webcam_index).start()
-    # vs= VideoStream(usePiCamera=True).start()       //For Raspberry Pi
     time.sleep(1.0)
 
-    while True:
+    COUNTER = 0
 
+    while True:
         frame = vs.read()
         frame = imutils.resize(frame, width=450)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        # rects = detector(gray, 0)
         rects = detector.detectMultiScale(
             gray,
             scaleFactor=1.1,
@@ -132,7 +108,6 @@ def detect_drowsiness(request):
             flags=cv2.CASCADE_SCALE_IMAGE,
         )
 
-        # for rect in rects:
         for x, y, w, h in rects:
             rect = dlib.rectangle(int(x), int(y), int(x + w), int(y + h))
 
@@ -154,14 +129,14 @@ def detect_drowsiness(request):
             lip = shape[48:60]
             cv2.drawContours(frame, [lip], -1, (0, 255, 0), 1)
 
-            if ear < EYE_AR_THRESH:
+            if ear < ear_thresh:
                 COUNTER += 1
 
-                if COUNTER >= EYE_AR_CONSEC_FRAMES:
-                    if alarm_status == False:
+                if COUNTER >= ear_frames:
+                    if not alarm_status:
                         alarm_status = True
                         t = Thread(target=alarm, args=("wake up sir",))
-                        t.deamon = True
+                        t.daemon = True
                         t.start()
 
                     cv2.putText(
@@ -173,12 +148,11 @@ def detect_drowsiness(request):
                         (0, 0, 255),
                         2,
                     )
-
             else:
                 COUNTER = 0
                 alarm_status = False
 
-            if distance > YAWN_THRESH:
+            if distance > yawn_thresh:
                 cv2.putText(
                     frame,
                     "Yawn Alert",
@@ -188,10 +162,10 @@ def detect_drowsiness(request):
                     (0, 0, 255),
                     2,
                 )
-                if alarm_status2 == False and saying == False:
+                if not alarm_status2 and not saying:
                     alarm_status2 = True
                     t = Thread(target=alarm, args=("take some fresh air sir",))
-                    t.deamon = True
+                    t.daemon = True
                     t.start()
             else:
                 alarm_status2 = False
@@ -224,4 +198,23 @@ def detect_drowsiness(request):
     cv2.destroyAllWindows()
     vs.stop()
 
-    return render(request, 'index.html')
+# View function
+def detect_drowsiness(request):
+    # Replace command-line argument parsing with getting parameters from the request
+    webcam_index = int(request.GET.get('webcam', 0))
+    ear_thresh = float(request.GET.get('ear_thresh', 0.3))
+    ear_frames = int(request.GET.get('ear_frames', 30))
+    yawn_thresh = int(request.GET.get('yawn_thresh', 20))
+
+    # Use parameters in the code instead of argparse
+    drowsiness_thread = Thread(
+        target=drowsiness_detection, args=(webcam_index, ear_thresh, ear_frames, yawn_thresh)
+    )
+    drowsiness_thread.daemon = True
+    drowsiness_thread.start()
+
+    return JsonResponse({'status': 'success'})
+
+
+
+# # http://127.0.0.1:8000/detect_drowsiness/?webcam=0&ear_thresh=0.3&ear_frames=30&yawn_thresh=20
