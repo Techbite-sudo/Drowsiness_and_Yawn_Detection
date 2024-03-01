@@ -20,6 +20,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .forms.forms import CustomUserCreationForm
 
+def admin_view(request):
+    return render(request, "admin_dashboard.html", {})
+
+def driver_view(request):
+    return render(request, "driver_dashboard.html", {})
+
+def car_owner_view(request):
+    return render(request, "car_owner_dashboard.html", {})
 
 def home(request):
     # Retrieve the current year (optional)
