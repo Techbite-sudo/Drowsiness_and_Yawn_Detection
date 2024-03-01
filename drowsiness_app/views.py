@@ -50,7 +50,7 @@ def register(request):
     else:
         form = CustomUserCreationForm()
 
-    return render(request, "registration/register.html", {"form": form})
+    return render(request, "register.html", {"form": form})
 
 
 def custom_login(request):
@@ -72,7 +72,7 @@ def custom_login(request):
             # Handle invalid login credentials
             messages.error(request, "Invalid username or password! Please try again.")
 
-    return render(request, "registration/login.html")
+    return render(request, "login.html")
 
 
 @login_required
