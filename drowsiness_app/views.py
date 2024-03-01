@@ -1,4 +1,6 @@
 # drowsiness_detection/views.py
+# from datetime import datetime
+import datetime
 import os
 from django.http import JsonResponse
 from threading import Thread
@@ -29,7 +31,7 @@ def home(request):
         "year": current_year,  # Optional
     }
 
-    return render(request, "home.html", context)
+    return render(request, "index.html", context)
 
 
 def register(request):
