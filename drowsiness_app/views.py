@@ -19,15 +19,23 @@ from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .forms.forms import CustomUserCreationForm
+from .models import CustomUser
 
+
+# @login_required
 def admin_view(request):
     return render(request, "admin_dashboard.html", {})
 
+
+# @login_required
 def driver_view(request):
     return render(request, "driver_dashboard.html", {})
 
+
+# @login_required
 def car_owner_view(request):
     return render(request, "car_owner_dashboard.html", {})
+
 
 def home(request):
     # Retrieve the current year (optional)
@@ -65,6 +73,15 @@ def custom_login(request):
     if request.method == "POST":
         username = request.POST["username"]
         password = request.POST["password"]
+
+        # Check if user exists
+        try:
+            user = CustomUser.objects.get(username=username)
+        except CustomUser.DoesNotExist:
+            messages.error(request, "User with this username does not exist!")
+            return render(request, "login.html")
+        print(f"Username: {username}, Password: {password}")
+
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
