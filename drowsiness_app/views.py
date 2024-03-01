@@ -19,6 +19,19 @@ from django.contrib import messages
 from .forms.forms import CustomUserCreationForm
 
 
+def home(request):
+    # Retrieve the current year (optional)
+    current_year = datetime.date.today().year
+
+    # Create the context dictionary
+    context = {
+        "app_name": "DrowsiSense",  # Replace with your actual app name
+        "year": current_year,  # Optional
+    }
+
+    return render(request, "home.html", context)
+
+
 def register(request):
     if request.method == "POST":
         form = CustomUserCreationForm(request.POST)
