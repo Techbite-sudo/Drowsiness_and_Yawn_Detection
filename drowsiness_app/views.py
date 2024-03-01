@@ -13,7 +13,9 @@ import dlib
 import pygame.mixer
 
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, authenticate
+from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from .forms.forms import CustomUserCreationForm
 
 
@@ -23,9 +25,13 @@ def register(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            return redirect(
-                "login"
-            )  # Redirect to login for simplicity, update as needed
+            return redirect("login")
+        else:
+            # Handle form errors
+            messages.error(
+                request,
+                "Registration failed! Please ensure all fields are filled correctly.",
+            )
     else:
         form = CustomUserCreationForm()
 
@@ -34,7 +40,6 @@ def register(request):
 
 def custom_login(request):
     if request.method == "POST":
-        # Your existing login logic here
         username = request.POST["username"]
         password = request.POST["password"]
         user = authenticate(request, username=username, password=password)
@@ -48,8 +53,27 @@ def custom_login(request):
                 return redirect("driver_dashboard")
             elif user.user_role == "car_owner":
                 return redirect("car_owner_dashboard")
+        else:
+            # Handle invalid login credentials
+            messages.error(request, "Invalid username or password! Please try again.")
 
     return render(request, "registration/login.html")
+
+
+@login_required
+def logout_view(request):
+    logout(request)
+    messages.success(request, "You have been successfully logged out.")
+    return redirect("login")
+
+
+# This is an example using Django's permission framework (replace with your actual permission checks)
+@login_required
+def some_view(request):
+    if not request.user.has_perm("app.view_secret_data"):
+        messages.error(request, "You are not authorized to view this information.")
+        return redirect("unauthorized")
+    # Rest of your view logic here
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

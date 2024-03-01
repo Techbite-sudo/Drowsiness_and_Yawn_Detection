@@ -1,0 +1,23 @@
+/* Customize as needed for your specific design preferences */
+body {
+    font-family: sans-serif;
+  }
+  
+  .display-4 {
+    color: #333;
+  }
+  
+  .btn-primary {
+    background-color: #3882f3;
+    border-color: #3882f3;
+  }
+  
+  .btn-outline-primary {
+    color: #3882f3;
+    border-color: #3882f3;
+  }
+  
+  footer {
+    font-size: 0.8rem;
+  }
+  
