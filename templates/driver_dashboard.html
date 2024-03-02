@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -10,26 +11,112 @@
       integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65"
       crossorigin="anonymous"
     />
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      .container-fluid {
+        padding: 20px;
+      }
+
+      .user-profile {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .user-profile img {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        object-fit: cover;
+        margin-right: 10px;
+      }
+
+      .nav-drawer {
+        position: fixed;
+        top: 0;
+        left: -250px;
+        width: 250px;
+        height: 100%;
+        background: #111;
+        padding-top: 50px;
+        transition: 0.5s;
+      }
+
+      .nav-drawer a {
+        text-decoration: none;
+        font-size: 20px;
+        color: white;
+        display: block;
+        padding: 15px;
+        transition: 0.3s;
+      }
+
+      .nav-drawer a:hover {
+        background: #ffc107;
+        color: black;
+      }
+
+      .content {
+        margin-left: 250px;
+        transition: 0.5s;
+      }
+    </style>
   </head>
+
   <body>
-    <div class="container p-3">
-      <div class="card mb-3">
-        <div class="card-header">
-          <h3>Upcoming Trip</h3>
+    <!-- Navigation Drawer -->
+    <div class="nav-drawer">
+      <a href="#">Profile</a>
+      <a href="#">Settings</a>
+      <button
+        class="btn btn-primary"
+        onclick="sendDataToServer({your_data_here})"
+      >
+        Start Drowsiness Detection
+      </button>
+      <a href="#">Logout</a>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <div class="container-fluid">
+        <!-- User Profile Section -->
+        <div class="user-profile">
+          <div>
+            <img src="{% static 'afro-man.jpg' %}" alt="Profile Picture" />
+            <span>Welcome, {{ user.username }}</span>
+          </div>
+          <button class="btn btn-primary" id="openNav">Open Navigation</button>
         </div>
-        <div class="card-body"></div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <h3>Recent Trips</h3>
+
+        <!-- Upcoming Trip -->
+        <div class="card mb-3">
+          <div class="card-header">
+            <h3>Upcoming Trip</h3>
+          </div>
+          <div class="card-body"></div>
         </div>
-        <div class="card-body"></div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <h3>Drowsiness Alerts</h3>
+
+        <!-- Recent Trips -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Recent Trips</h3>
+          </div>
+          <div class="card-body"></div>
         </div>
-        <div class="card-body"></div>
+
+        <!-- Drowsiness Alerts -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Drowsiness Alerts</h3>
+          </div>
+          <div class="card-body"></div>
+        </div>
       </div>
     </div>
 
@@ -38,5 +125,45 @@
       integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jC8suMOhJwxtlLOMGwCSySfCVwVvZ6"
       crossorigin="anonymous"
     ></script>
+
+    <script>
+      // JavaScript to open/close the navigation drawer
+      document.getElementById("openNav").addEventListener("click", function () {
+        document.querySelector(".nav-drawer").style.left = "0";
+        document.querySelector(".content").style.marginLeft = "250px";
+      });
+
+      document.addEventListener("click", function (event) {
+        if (
+          !event.target.closest(".nav-drawer") &&
+          !event.target.closest("#openNav")
+        ) {
+          document.querySelector(".nav-drawer").style.left = "-250px";
+          document.querySelector(".content").style.marginLeft = "0";
+        }
+      });
+    </script>
+    <script>
+      const socket = new WebSocket("ws://yourdomain.com/ws/some_path/"); // Update with your actual WebSocket path
+
+      socket.onopen = (event) => {
+        console.log("WebSocket connection opened:", event);
+      };
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        // Handle the received data from the server
+        console.log("Received data:", data);
+      };
+
+      socket.onclose = (event) => {
+        console.log("WebSocket connection closed:", event);
+      };
+
+      // Function to send data to the server
+      function sendDataToServer(data) {
+        socket.send(JSON.stringify(data));
+      }
+    </script>
   </body>
 </html>

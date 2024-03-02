@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'crispy_forms',
+    'channels',
     'drowsiness_app',
 ]
 
@@ -71,6 +72,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'drowsiness_project.wsgi.application'
+ASGI_APPLICATION = 'drowsiness_project.routing.application'
 
 
 # Database
