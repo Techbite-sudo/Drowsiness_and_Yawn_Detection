@@ -15,11 +15,14 @@ import dlib
 import pygame.mixer
 
 from django.shortcuts import render, redirect
+
 # from django.contrib.auth import login, authenticate, logout
 
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
-from django.contrib.auth import login as auth_login, logout
+from django.contrib.auth import login as auth_login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 
 
@@ -31,40 +34,32 @@ def home(request):
     return render(request, "index.html", context)
 
 
-def register(request):
+def login_view(request):
+    if request.method == "POST":
+        email = request.POST.get("email")
+        password = request.POST.get("password")
+        user = authenticate(request, username=email, password=password)
+        if user is not None:
+            login(request, user)
+            return redirect("home")
+        else:
+            messages.error(request, "Invalid email or password.")
+    return render(request, "login.html")
+
+
+def register_view(request):
     if request.method == "POST":
         form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            auth_login(request, user)
-            messages.success(request, "Registration successful!")
-            return redirect("driver_dashboard")
-        else:
-            messages.error(request, "Registration failed. Please try again.")
+            email = form.cleaned_data.get("email")
+            password = form.cleaned_data.get("password1")
+            user = authenticate(request, username=email, password=password)
+            login(request, user)
+            return redirect("home")
     else:
         form = UserCreationForm()
-    context = {
-        "form": form,
-    }
-    return render(request, "register.html", context)
-
-
-def login(request):
-    if request.method == "POST":
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            user = form.get_user()
-            auth_login(request, user)
-            messages.success(request, "Login successful!")
-            return redirect("driver_dashboard")
-        else:
-            messages.error(request, "Invalid username or password.")
-    else:
-        form = AuthenticationForm()
-    context = {
-        "form": form,
-    }
-    return render(request, "login.html", context)
+    return render(request, "register.html", {"form": form})
 
 
 @login_required
@@ -84,9 +79,7 @@ def logout_view(request):
     messages.success(request, "Logout successful!")
     return redirect("home")
 
-
 # You can implement the detect_drowsiness view here
-
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 alarm_status = False

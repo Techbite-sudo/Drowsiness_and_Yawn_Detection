@@ -1,3 +1,13 @@
+{% comment %} {% extends 'base.html' %} {% block content %}
+<div class="register-card">
+  <h2>Register</h2>
+  <form method="post">
+    {% csrf_token %} {{ form.as_p }}
+    <button type="submit" class="btn btn-primary btn-block">Register</button>
+  </form>
+</div>
+{% endblock %}  {% endcomment %}
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
