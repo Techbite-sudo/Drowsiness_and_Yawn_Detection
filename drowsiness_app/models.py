@@ -1,9 +1,10 @@
 from django.db import models
 from django.conf import settings
-from django.contrib.auth.models import User, AbstractUser
+from django.contrib.auth.models import AbstractUser
 
 
 class CustomUser(AbstractUser):
+    email = models.EmailField(unique=True)
     groups = models.ManyToManyField(
         "auth.Group",
         verbose_name="groups",
@@ -21,6 +22,9 @@ class CustomUser(AbstractUser):
         related_name="custom_user_set",
         related_query_name="user",
     )
+
+    def __str__(self):
+        return self.email
 
 
 class DriverProfile(models.Model):

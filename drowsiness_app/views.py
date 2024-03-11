@@ -17,13 +17,12 @@ import pygame.mixer
 from django.shortcuts import render, redirect
 
 # from django.contrib.auth import login, authenticate, logout
-
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
-from django.contrib.auth import login as auth_login
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.shortcuts import render, redirect
+from .forms import CustomUserCreationForm
+from .models import CustomUser, DriverProfile, Alert
 
 
 def home(request):
@@ -41,7 +40,7 @@ def login_view(request):
         user = authenticate(request, username=email, password=password)
         if user is not None:
             login(request, user)
-            return redirect("home")
+            return redirect("driver_view")
         else:
             messages.error(request, "Invalid email or password.")
     return render(request, "login.html")
@@ -49,27 +48,27 @@ def login_view(request):
 
 def register_view(request):
     if request.method == "POST":
-        form = UserCreationForm(request.POST)
+        form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
             email = form.cleaned_data.get("email")
             password = form.cleaned_data.get("password1")
             user = authenticate(request, username=email, password=password)
             login(request, user)
-            return redirect("home")
+            DriverProfile.objects.create(user=user)
+            return redirect("driver_view")
     else:
-        form = UserCreationForm()
+        form = CustomUserCreationForm()
     return render(request, "register.html", {"form": form})
 
 
 @login_required
 def driver_view(request):
-    # Implement your drowsiness detection logic here
+    user = request.user
+    driver_profile = DriverProfile.objects.get(user=user)
+    alerts = Alert.objects.filter(driver=driver_profile)
     context = {
-        "alerts": [
-            "Drowsiness detected at 10:15 AM",
-            "Excessive yawning detected at 11:30 AM",
-        ],
+        "alerts": alerts,
     }
     return render(request, "driver_dashboard.html", context)
 
@@ -78,6 +77,7 @@ def logout_view(request):
     logout(request)
     messages.success(request, "Logout successful!")
     return redirect("home")
+
 
 # You can implement the detect_drowsiness view here
 
