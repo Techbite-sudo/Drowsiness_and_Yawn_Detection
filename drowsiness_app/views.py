@@ -76,14 +76,18 @@ def custom_login(request):
 
         # Check if user exists
         try:
-            user = CustomUser.objects.get(username=username)
+            # user = CustomUser.objects.get(username__iexact=username)
+            user = CustomUser.objects.get(username__exact=username)
+
         except CustomUser.DoesNotExist:
             messages.error(request, "User with this username does not exist!")
             return render(request, "login.html")
-        print(f"Username: {username}, Password: {password}")
 
+        # Authenticate the user
         user = authenticate(request, username=username, password=password)
+
         if user is not None:
+            # Correct username and password
             login(request, user)
 
             # Redirect users based on their role
@@ -94,8 +98,8 @@ def custom_login(request):
             elif user.user_role == "car_owner":
                 return redirect("car_owner_dashboard")
         else:
-            # Handle invalid login credentials
-            messages.error(request, "Invalid username or password! Please try again.")
+            # Incorrect password
+            messages.error(request, "Invalid password! Please try again.")
 
     return render(request, "login.html")
 
