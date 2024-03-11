@@ -15,109 +15,77 @@ import dlib
 import pygame.mixer
 
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, authenticate, logout
+# from django.contrib.auth import login, authenticate, logout
+
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth import login as auth_login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .forms.forms import CustomUserCreationForm
-from .models import CustomUser
-
-
-# @login_required
-def admin_view(request):
-    return render(request, "admin_dashboard.html", {})
-
-
-# @login_required
-def driver_view(request):
-    return render(request, "driver_dashboard.html", {})
-
-
-# @login_required
-def car_owner_view(request):
-    return render(request, "car_owner_dashboard.html", {})
 
 
 def home(request):
-    # Retrieve the current year (optional)
-    current_year = datetime.date.today().year
-
-    # Create the context dictionary
     context = {
-        "app_name": "DrowsiSense",  # Replace with your actual app name
-        "year": current_year,  # Optional
+        "app_name": "DrowsiSense",
+        "year": 2023,
     }
-
     return render(request, "index.html", context)
 
 
 def register(request):
     if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
+        form = UserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            login(request, user)
-            return redirect("login")
+            auth_login(request, user)
+            messages.success(request, "Registration successful!")
+            return redirect("driver_dashboard")
         else:
-            # Handle form errors
-            messages.error(
-                request,
-                "Registration failed! Please ensure all fields are filled correctly.",
-            )
+            messages.error(request, "Registration failed. Please try again.")
     else:
-        form = CustomUserCreationForm()
+        form = UserCreationForm()
+    context = {
+        "form": form,
+    }
+    return render(request, "register.html", context)
 
-    return render(request, "register.html", {"form": form})
 
-
-def custom_login(request):
+def login(request):
     if request.method == "POST":
-        username = request.POST["username"]
-        password = request.POST["password"]
-
-        # Check if user exists
-        try:
-            # user = CustomUser.objects.get(username__iexact=username)
-            user = CustomUser.objects.get(username__exact=username)
-
-        except CustomUser.DoesNotExist:
-            messages.error(request, "User with this username does not exist!")
-            return render(request, "login.html")
-
-        # Authenticate the user
-        user = authenticate(request, username=username, password=password)
-
-        if user is not None:
-            # Correct username and password
-            login(request, user)
-
-            # Redirect users based on their role
-            if user.user_role == "admin":
-                return redirect("admin_dashboard")
-            elif user.user_role == "driver":
-                return redirect("driver_dashboard")
-            elif user.user_role == "car_owner":
-                return redirect("car_owner_dashboard")
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            auth_login(request, user)
+            messages.success(request, "Login successful!")
+            return redirect("driver_dashboard")
         else:
-            # Incorrect password
-            messages.error(request, "Invalid password! Please try again.")
-
-    return render(request, "login.html")
+            messages.error(request, "Invalid username or password.")
+    else:
+        form = AuthenticationForm()
+    context = {
+        "form": form,
+    }
+    return render(request, "login.html", context)
 
 
 @login_required
+def driver_view(request):
+    # Implement your drowsiness detection logic here
+    context = {
+        "alerts": [
+            "Drowsiness detected at 10:15 AM",
+            "Excessive yawning detected at 11:30 AM",
+        ],
+    }
+    return render(request, "driver_dashboard.html", context)
+
+
 def logout_view(request):
     logout(request)
-    messages.success(request, "You have been successfully logged out.")
-    return redirect("login")
+    messages.success(request, "Logout successful!")
+    return redirect("home")
 
 
-# This is an example using Django's permission framework (replace with your actual permission checks)
-@login_required
-def some_view(request):
-    if not request.user.has_perm("app.view_secret_data"):
-        messages.error(request, "You are not authorized to view this information.")
-        return redirect("unauthorized")
-    # Rest of your view logic here
+# You can implement the detect_drowsiness view here
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
