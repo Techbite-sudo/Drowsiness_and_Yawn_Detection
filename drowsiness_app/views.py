@@ -121,6 +121,7 @@ def update_settings(request):
 monitoring_thread = None
 
 
+# Modify the toggle_monitoring function
 @login_required
 @csrf_exempt
 @require_POST
@@ -197,7 +198,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 alarm_status = False
 alarm_status2 = False
 saying = False
-
 
 
 def eye_aspect_ratio(eye):
