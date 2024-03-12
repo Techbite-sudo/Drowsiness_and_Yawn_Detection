@@ -57,3 +57,26 @@ class Alert(models.Model):
 
     def __str__(self):
         return f"{self.alert_type} - {self.driver.user.username} ({self.timestamp})"
+
+
+class UserSettings(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="user_settings",
+    )
+    ear_threshold = models.FloatField(default=0.3)
+    ear_frames = models.IntegerField(default=30)
+    yawn_threshold = models.IntegerField(default=20)
+    alert_frequency = models.CharField(
+        max_length=10,
+        choices=(
+            ("low", "Low"),
+            ("medium", "Medium"),
+            ("high", "High"),
+        ),
+        default="medium",
+    )
+
+    def __str__(self):
+        return f"{self.user.username}'s Settings"

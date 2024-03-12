@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import DriverProfile, Alert, CustomUser
-
+from .models import DriverProfile, Alert, CustomUser, UserSettings
 
 # Register the custom user model with the admin
 class CustomUserAdmin(UserAdmin):
@@ -34,7 +33,10 @@ class CustomUserAdmin(UserAdmin):
         ),
     )
 
+class UserSettingsAdmin(admin.ModelAdmin):
+    list_display = ["user", "ear_threshold", "ear_frames", "yawn_threshold", "alert_frequency"]
 
 admin.site.register(CustomUser, CustomUserAdmin)
 admin.site.register(DriverProfile)
 admin.site.register(Alert)
+admin.site.register(UserSettings, UserSettingsAdmin)
