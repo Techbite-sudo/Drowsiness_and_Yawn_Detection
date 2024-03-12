@@ -75,12 +75,16 @@
           <div class="card">
             <div class="card-body">
               <h5 class="card-title">Alert History</h5>
+              {% for alert in alerts %}
               <div class="alert alert-warning" role="alert">
-                Drowsiness detected at 10:15 AM
+                {{ alert.alert_type }} - {{ alert.timestamp }} {% if
+                alert.description %}
+                <br />
+                {{ alert.description }} {% endif %}
               </div>
-              <div class="alert alert-warning" role="alert">
-                Excessive yawning detected at 11:30 AM
-              </div>
+              {% empty %}
+              <p>No alerts yet.</p>
+              {% endfor %}
             </div>
           </div>
         </div>
@@ -100,29 +104,54 @@
           <div class="card">
             <div class="card-body">
               <h5 class="card-title">Settings</h5>
-              <form>
+              <form method="post" action="{% url 'update_settings' %}">
+                {% csrf_token %}
                 <div class="form-group">
                   <label for="sensitivity">Sensitivity</label>
                   <input
                     type="range"
                     class="form-control-range"
                     id="sensitivity"
-                    min="1"
-                    max="10"
-                    value="5"
+                    name="ear_threshold"
+                    min="0.1"
+                    max="0.5"
+                    step="0.05"
+                    value="{{ user_settings.ear_threshold }}"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="ear_frames">Consecutive Frames</label>
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="ear_frames"
+                    name="ear_frames"
+                    min="10"
+                    max="60"
+                    value="{{ user_settings.ear_frames }}"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="yawn_threshold">Yawn Threshold</label>
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="yawn_threshold"
+                    name="yawn_threshold"
+                    min="10"
+                    max="50"
+                    value="{{ user_settings.yawn_threshold }}"
                   />
                 </div>
                 <div class="form-group">
                   <label for="alertFrequency">Alert Frequency</label>
-                  <select class="form-control" id="alertFrequency">
-                    <option>Low</option>
-                    <option selected>Medium</option>
-                    <option>High</option>
+                  <select class="form-control" id="alertFrequency" name="alert_frequency">
+                    <option value="low" {% if user_settings.alert_frequency == 'low' %}selected{% endif %}>Low</option>
+                    <option value="medium" {% if user_settings.alert_frequency == 'medium' %}selected{% endif %}>Medium</option>
+                    <option value="high" {% if user_settings.alert_frequency == 'high' %}selected{% endif %}>High</option>
                   </select>
                 </div>
-                <button type="submit" class="btn btn-primary">
-                  Save Settings
-                </button>
+                <button type="submit" class="btn btn-primary">Save Settings</button>
               </form>
             </div>
           </div>

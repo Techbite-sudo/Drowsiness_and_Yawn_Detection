@@ -22,7 +22,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.shortcuts import render, redirect
 from .forms import CustomUserCreationForm
-from .models import CustomUser, DriverProfile, Alert
+from .models import CustomUser, DriverProfile, Alert, UserSettings
+
+# from .drowsiness_detection import drowsiness_detection
 
 
 def home(request):
@@ -31,7 +33,7 @@ def home(request):
         "year": 2023,
     }
     return render(request, "index.html", context)
-    
+
 
 def login_view(request):
     if request.method == "POST":
@@ -73,6 +75,45 @@ def driver_view(request):
     return render(request, "driver_dashboard.html", context)
 
 
+@login_required
+def driver_dashboard(request):
+    user = request.user
+    alerts = Alert.objects.filter(user=user).order_by("-timestamp")
+    user_settings = UserSettings.objects.get_or_create(user=user)[0]
+
+    context = {
+        "alerts": alerts,
+        "user_settings": user_settings,
+    }
+    return render(request, "driver_dashboard.html", context)
+
+
+@login_required
+def update_settings(request):
+    if request.method == "POST":
+        user = request.user
+        user_settings, created = UserSettings.objects.get_or_create(user=user)
+
+        ear_threshold = request.POST.get("ear_threshold", user_settings.ear_threshold)
+        ear_frames = request.POST.get("ear_frames", user_settings.ear_frames)
+        yawn_threshold = request.POST.get(
+            "yawn_threshold", user_settings.yawn_threshold
+        )
+        alert_frequency = request.POST.get(
+            "alert_frequency", user_settings.alert_frequency
+        )
+
+        user_settings.ear_threshold = float(ear_threshold)
+        user_settings.ear_frames = int(ear_frames)
+        user_settings.yawn_threshold = int(yawn_threshold)
+        user_settings.alert_frequency = alert_frequency
+        user_settings.save()
+
+        return redirect("driver_dashboard")
+
+    return redirect("driver_dashboard")
+
+
 def logout_view(request):
     logout(request)
     messages.success(request, "Logout successful!")
@@ -80,14 +121,33 @@ def logout_view(request):
 
 
 # You can implement the detect_drowsiness view here
+def detect_drowsiness(request):
+    user = request.user
+    user_settings = UserSettings.objects.get_or_create(user=user)[0]
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-alarm_status = False
-alarm_status2 = False
-saying = False
+    webcam_index = 0  # Default webcam index
+    ear_thresh = user_settings.ear_threshold
+    ear_frames = user_settings.ear_frames
+    yawn_thresh = user_settings.yawn_threshold
+
+    drowsiness_thread = Thread(
+        target=drowsiness_detection,
+        args=(webcam_index, ear_thresh, ear_frames, yawn_thresh, user),
+    )
+    drowsiness_thread.daemon = True
+    drowsiness_thread.start()
+
+    return redirect("driver_dashboard")
 
 
-def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
+# BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# alarm_status = False
+# alarm_status2 = False
+# saying = False
+
+
+# Modify the drowsiness_detection function to accept the user object
+def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user):
     global alarm_status
     global alarm_status2
     global saying
@@ -115,6 +175,10 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
             s = 'espeak "' + msg + '"'
             os.system(s)
             saying = False
+
+        # Create an alert instance and save it to the database
+        alert = Alert(user=user, alert_type="drowsiness", description=msg)
+        alert.save()
 
     def eye_aspect_ratio(eye):
         A = dist.euclidean(eye[1], eye[5])
@@ -266,23 +330,4 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh):
     vs.stop()
 
 
-# View function
-def detect_drowsiness(request):
-    # Replace command-line argument parsing with getting parameters from the request
-    webcam_index = int(request.GET.get("webcam", 0))
-    ear_thresh = float(request.GET.get("ear_thresh", 0.3))
-    ear_frames = int(request.GET.get("ear_frames", 30))
-    yawn_thresh = int(request.GET.get("yawn_thresh", 20))
-
-    # Use parameters in the code instead of argparse
-    drowsiness_thread = Thread(
-        target=drowsiness_detection,
-        args=(webcam_index, ear_thresh, ear_frames, yawn_thresh),
-    )
-    drowsiness_thread.daemon = True
-    drowsiness_thread.start()
-
-    return JsonResponse({"status": "success"})
-
-
-# # http://127.0.0.1:8000/detect_drowsiness/?webcam=0&ear_thresh=0.3&ear_frames=30&yawn_thresh=20
+# http://127.0.0.1:8000/detect_drowsiness/?webcam=0&ear_thresh=0.3&ear_frames=30&yawn_thresh=20
