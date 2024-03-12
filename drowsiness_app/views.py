@@ -14,7 +14,6 @@ import numpy as np
 import dlib
 import pygame.mixer
 
-from django.shortcuts import render, redirect
 
 # from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth import authenticate, login, logout
@@ -23,6 +22,9 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 from .forms import CustomUserCreationForm
 from .models import CustomUser, DriverProfile, Alert, UserSettings
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 # from .drowsiness_detection import drowsiness_detection
 
@@ -114,6 +116,54 @@ def update_settings(request):
     return redirect("driver_dashboard")
 
 
+# Global variable to track the monitoring status
+monitoring_thread = None
+
+@login_required
+@csrf_exempt
+@require_POST
+def toggle_monitoring(request):
+    global monitoring_thread
+
+    action = request.POST.get("action")
+    user = request.user
+
+    if action == "start":
+        if not monitoring_thread or not monitoring_thread.is_alive():
+            webcam_index = 0  # Default webcam index
+            ear_thresh = user.user_settings.ear_threshold
+            ear_frames = user.user_settings.ear_frames
+            yawn_thresh = user.user_settings.yawn_threshold
+
+            def safe_stop_monitoring():
+                global monitoring_thread
+                if monitoring_thread:
+                    monitoring_thread.join()  # Wait for the thread to finish
+                    monitoring_thread = None
+
+            monitoring_thread = Thread(
+                target=drowsiness_detection,
+                args=(webcam_index, ear_thresh, ear_frames, yawn_thresh, user),
+                daemon=True,
+                # Set a callback function for thread termination
+                on_terminate=safe_stop_monitoring,
+            )
+            monitoring_thread.start()
+
+            message = "Monitoring started successfully."
+        else:
+            message = "Monitoring is already running."
+    else:
+        if monitoring_thread and monitoring_thread.is_alive():
+            # Safe thread termination using the callback mechanism
+            monitoring_thread.raise_exception()  # Signal the thread to stop
+            message = "Monitoring stopped successfully."
+        else:
+            message = "Monitoring is already stopped."
+
+    return JsonResponse({"action": action, "message": message})
+
+
 def logout_view(request):
     logout(request)
     messages.success(request, "Logout successful!")
@@ -140,7 +190,7 @@ def detect_drowsiness(request):
     return redirect("driver_dashboard")
 
 
-# BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # alarm_status = False
 # alarm_status2 = False
 # saying = False

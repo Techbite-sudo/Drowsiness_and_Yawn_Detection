@@ -67,7 +67,9 @@
               <p class="card-text">
                 System Status: <span class="badge badge-success">Active</span>
               </p>
-              <button class="btn btn-primary">Start/Stop Monitoring</button>
+              <button class="btn btn-primary" onclick="toggleMonitoring()">
+                Start Monitoring
+              </button>
             </div>
           </div>
 
@@ -162,5 +164,36 @@
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+      function toggleMonitoring() {
+        // Send an AJAX request to the server to start/stop monitoring
+        fetch("{% url 'toggle_monitoring' %}", {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": "{{ csrf_token }}",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            action: event.target.innerText.toLowerCase().includes("start")
+              ? "start"
+              : "stop",
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            // Update the button text based on the action
+            event.target.innerText =
+              data.action === "start"
+                ? "Stop Monitoring"
+                : "Start Monitoring";
+    
+            // Display a success message
+            alert(data.message);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
+      }
+    </script>
   </body>
 </html>
