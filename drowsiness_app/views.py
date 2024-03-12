@@ -31,13 +31,13 @@ def home(request):
         "year": 2023,
     }
     return render(request, "index.html", context)
-
+    
 
 def login_view(request):
     if request.method == "POST":
-        email = request.POST.get("email")
+        username = request.POST.get("email")  # Use the email as the username
         password = request.POST.get("password")
-        user = authenticate(request, email=email, password=password)
+        user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
             return redirect("driver_view")
