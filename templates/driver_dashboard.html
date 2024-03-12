@@ -82,9 +82,9 @@
                 {{ alert.alert_type }} - {{ alert.timestamp }} {% if
                 alert.description %}
                 <br />
-                {{ alert.description }} {% endif %}
+                {{ alert.description }} {% endfor %}
               </div>
-              {% empty %}
+               {% empty %}
               <p>No alerts yet.</p>
               {% endfor %}
             </div>

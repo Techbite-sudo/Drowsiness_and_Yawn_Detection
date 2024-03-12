@@ -68,11 +68,17 @@ def register_view(request):
 
 @login_required
 def driver_view(request):
-    user = request.user
-    driver_profile = DriverProfile.objects.get(user=user)
-    alerts = Alert.objects.filter(driver=driver_profile)
+    # user = request.user
+    # driver_profile = DriverProfile.objects.get(user=user)
+    # alerts = Alert.objects.filter(driver=driver_profile)
+    # context = {
+    #     "alerts": alerts,
+    # }
     context = {
-        "alerts": alerts,
+        "alerts": [
+            "Drowsiness detected at 10:15 AM",
+            "Excessive yawning detected at 11:30 AM",
+        ],
     }
     return render(request, "driver_dashboard.html", context)
 
@@ -118,6 +124,7 @@ def update_settings(request):
 
 # Global variable to track the monitoring status
 monitoring_thread = None
+
 
 @login_required
 @csrf_exempt
