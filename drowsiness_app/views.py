@@ -1,5 +1,3 @@
-# drowsiness_detection/views.py
-# from datetime import datetime
 import datetime
 import os
 from django.http import JsonResponse
@@ -15,7 +13,6 @@ import dlib
 import pygame.mixer
 
 
-# from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -25,8 +22,6 @@ from .models import CustomUser, DriverProfile, Alert, UserSettings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-
-# from .drowsiness_detection import drowsiness_detection
 
 
 def home(request):
@@ -136,7 +131,9 @@ def toggle_monitoring(request):
     user = request.user
 
     if action == "start":
-        if not monitoring_thread or not monitoring_thread.is_alive():
+        if not monitoring_thread or (
+            monitoring_thread and not monitoring_thread.is_alive()
+        ):
             webcam_index = 0  # Default webcam index
             ear_thresh = user.user_settings.ear_threshold
             ear_frames = user.user_settings.ear_frames
@@ -152,7 +149,6 @@ def toggle_monitoring(request):
                 target=drowsiness_detection,
                 args=(webcam_index, ear_thresh, ear_frames, yawn_thresh, user),
                 daemon=True,
-                # Set a callback function for thread termination
                 on_terminate=safe_stop_monitoring,
             )
             monitoring_thread.start()
@@ -166,7 +162,7 @@ def toggle_monitoring(request):
             monitoring_thread.raise_exception()  # Signal the thread to stop
             message = "Monitoring stopped successfully."
         else:
-            message = "Monitoring is already stopped."
+            message = "Monitoring is not running."
 
     return JsonResponse({"action": action, "message": message})
 
@@ -198,24 +194,61 @@ def detect_drowsiness(request):
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# alarm_status = False
-# alarm_status2 = False
-# saying = False
+alarm_status = False
+alarm_status2 = False
+saying = False
 
 
-# Modify the drowsiness_detection function to accept the user object
+
+def eye_aspect_ratio(eye):
+    A = dist.euclidean(eye[1], eye[5])
+    B = dist.euclidean(eye[2], eye[4])
+
+    C = dist.euclidean(eye[0], eye[3])
+
+    ear = (A + B) / (2.0 * C)
+
+    return ear
+
+
+def final_ear(shape):
+    (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
+    (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
+
+    leftEye = shape[lStart:lEnd]
+    rightEye = shape[rStart:rEnd]
+
+    leftEAR = eye_aspect_ratio(leftEye)
+    rightEAR = eye_aspect_ratio(rightEye)
+
+    ear = (leftEAR + rightEAR) / 2.0
+    return (ear, leftEye, rightEye)
+
+
+def lip_distance(shape):
+    top_lip = shape[50:53]
+    top_lip = np.concatenate((top_lip, shape[61:64]))
+
+    low_lip = shape[56:59]
+    low_lip = np.concatenate((low_lip, shape[65:68]))
+
+    top_mean = np.mean(top_lip, axis=0)
+    low_mean = np.mean(low_lip, axis=0)
+
+    distance = abs(top_mean[1] - low_mean[1])
+    return distance
+
+
 def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user):
-    global alarm_status
-    global alarm_status2
-    global saying
+    alarm_status = False
+    alarm_status2 = False
+    saying = False
 
     pygame.mixer.init()
     pygame.mixer.music.load(os.path.join(BASE_DIR, "static/music.wav"))
 
     def alarm(msg):
-        global alarm_status
-        global alarm_status2
-        global saying
+        nonlocal alarm_status, alarm_status2, saying
 
         while alarm_status:
             print("Playing audio alert...")
@@ -236,42 +269,6 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user
         # Create an alert instance and save it to the database
         alert = Alert(user=user, alert_type="drowsiness", description=msg)
         alert.save()
-
-    def eye_aspect_ratio(eye):
-        A = dist.euclidean(eye[1], eye[5])
-        B = dist.euclidean(eye[2], eye[4])
-
-        C = dist.euclidean(eye[0], eye[3])
-
-        ear = (A + B) / (2.0 * C)
-
-        return ear
-
-    def final_ear(shape):
-        (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
-        (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
-
-        leftEye = shape[lStart:lEnd]
-        rightEye = shape[rStart:rEnd]
-
-        leftEAR = eye_aspect_ratio(leftEye)
-        rightEAR = eye_aspect_ratio(rightEye)
-
-        ear = (leftEAR + rightEAR) / 2.0
-        return (ear, leftEye, rightEye)
-
-    def lip_distance(shape):
-        top_lip = shape[50:53]
-        top_lip = np.concatenate((top_lip, shape[61:64]))
-
-        low_lip = shape[56:59]
-        low_lip = np.concatenate((low_lip, shape[65:68]))
-
-        top_mean = np.mean(top_lip, axis=0)
-        low_mean = np.mean(low_lip, axis=0)
-
-        distance = abs(top_mean[1] - low_mean[1])
-        return distance
 
     print("-> Loading the predictor and detector...")
     detector = cv2.CascadeClassifier("static/haarcascade_frontalface_default.xml")
