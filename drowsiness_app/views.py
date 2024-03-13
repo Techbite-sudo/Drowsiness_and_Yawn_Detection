@@ -23,6 +23,8 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import HttpResponse
+import asyncio
+from asgiref.sync import sync_to_async
 
 
 def home(request):
@@ -117,27 +119,14 @@ def update_settings(request):
 
     return redirect("driver_dashboard")
 
-@login_required
-def start_video_stream(request):
-    user = request.user
-    webcam_index = 0  # Default webcam index
-    ear_thresh = user.user_settings.ear_threshold
-    ear_frames = user.user_settings.ear_frames
-    yawn_thresh = user.user_settings.yawn_threshold
 
-    try:
-        drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user)
-        return HttpResponse("Video stream started successfully.")
-    except Exception as e:
-        return HttpResponse(f"Error starting video stream: {e}")
-    
 # Global variable to track the monitoring status
 monitoring_thread = None
 
 
 # Modify the toggle_monitoring function
 @login_required
-@csrf_exempt
+# Remove @csrf_exempt decorator
 @require_POST
 def toggle_monitoring(request):
     global monitoring_thread
@@ -146,7 +135,9 @@ def toggle_monitoring(request):
     user = request.user
 
     if action == "start":
-        if not monitoring_thread or (monitoring_thread and not monitoring_thread.is_alive()):
+        if not monitoring_thread or (
+            monitoring_thread and not monitoring_thread.is_alive()
+        ):
             print("Creating monitoring thread...")
             webcam_index = 0  # Default webcam index
             ear_thresh = user.user_settings.ear_threshold
@@ -258,7 +249,9 @@ def lip_distance(shape):
     return distance
 
 
-def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user):
+async def drowsiness_detection(
+    webcam_index, ear_thresh, ear_frames, yawn_thresh, user, channel_layer
+):
     print("Drowsiness detection function called.")
     alarm_status = False
     alarm_status2 = False
@@ -266,6 +259,18 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user
 
     pygame.mixer.init()
     pygame.mixer.music.load(os.path.join(BASE_DIR, "static/music.wav"))
+
+    async def send_alert(msg, alert_type):
+        alert = Alert(user=user, alert_type=alert_type, description=msg)
+        await sync_to_async(alert.save, thread_sensitive=True)()
+        await channel_layer.group_send(
+            f"user_{user.id}",
+            {
+                "type": "send_message",
+                "message": msg,
+                "alert_type": alert_type,
+            },
+        )
 
     def alarm(msg):
         nonlocal alarm_status, alarm_status2, saying
@@ -350,7 +355,9 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user
                 if COUNTER >= ear_frames:
                     if not alarm_status:
                         alarm_status = True
-                        t = Thread(target=alarm, args=("wake up sir",))
+                        msg = "Drowsiness detected!"
+                        await send_alert(msg, "drowsiness")
+                        t = Thread(target=alarm, args=(msg,))
                         t.daemon = True
                         t.start()
 
@@ -368,6 +375,14 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user
                 alarm_status = False
 
             if distance > yawn_thresh:
+                msg = "Yawn Alert"
+                await send_alert(msg, "yawning")
+                if not alarm_status2 and not saying:
+                    alarm_status2 = True
+                    t = Thread(target=alarm, args=(msg,))
+                    t.daemon = True
+                    t.start()
+                    
                 cv2.putText(
                     frame,
                     "Yawn Alert",

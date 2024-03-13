@@ -67,7 +67,7 @@
               <p class="card-text">
                 System Status: <span class="badge badge-success">Active</span>
               </p>
-              <button id="monitoringButton" class="btn btn-primary" onclick="toggleMonitoring(this)">Start Monitoring</button>
+              <button id="monitoringButton" class="btn btn-primary">Start Monitoring</button>
             </div>
           </div>
 
@@ -166,55 +166,38 @@
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-      function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-          const cookies = document.cookie.split(';');
-          for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-              break;
-            }
-          }
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const wsUrl = wsProtocol + window.location.host + '/ws/monitoring/';
+      const websocket = new WebSocket(wsUrl);
+
+      websocket.onopen = function (event) {
+        console.log('WebSocket connection established.');
+      };
+
+      websocket.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+        if (data.action === 'start') {
+          document.getElementById("monitoringButton").textContent = "Stop Monitoring";
+        } else if (data.action === 'stop') {
+          document.getElementById("monitoringButton").textContent = "Start Monitoring";
+        } else if (data.alert_type) {
+          const alertElement = document.createElement('div');
+          alertElement.className = 'alert alert-warning';
+          alertElement.textContent = `${data.alert_type} - ${data.message}`;
+          const alertHistory = document.querySelector('.alert-history');
+          alertHistory.appendChild(alertElement);
         }
-        return cookieValue;
-      }
-
-      const csrftoken = getCookie('csrftoken');
-
-      function toggleMonitoring(event) {
-        // Send an AJAX request to the server to start/stop monitoring
-        let monitoringButton = document.getElementById("monitoringButton");
-        let action = event
-          ? monitoringButton.innerHTML.toLowerCase().includes("start")
-            ? "start"
-            : "stop"
-          : "start";
-      
-        fetch("{% url 'toggle_monitoring' %}", {
-          method: "POST",
-          headers: {
-            "X-CSRFToken": csrftoken,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action: action,
-          }),
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            // Update the button text based on the action
-            if (event) {
-              monitoringButton.innerHTML = data.action === "start" ? "Stop Monitoring" : "Start Monitoring";
-            }
-      
-            // Display a success message
-            alert(data.message);
-          })
-          .catch((error) => {
-            console.error("Error:", error);
-          });
+        alert(data.message);
+      };
+    
+      websocket.onerror = function(event) {
+        console.error('WebSocket error:', event);
+      };
+    
+      function toggleMonitoring() {
+        const button = document.getElementById("monitoringButton");
+        const action = button.textContent.toLowerCase().includes("start") ? "start" : "stop";
+        websocket.send(JSON.stringify({ action: action }));
       }
     </script>
   </body>

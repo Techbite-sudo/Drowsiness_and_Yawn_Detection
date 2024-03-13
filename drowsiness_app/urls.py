@@ -10,6 +10,5 @@ urlpatterns = [
     path("driver_dashboard/", views.driver_view, name="driver_dashboard"),
     path('update-settings/', views.update_settings, name='update_settings'),
     path('toggle-monitoring/', views.toggle_monitoring, name='toggle_monitoring'),
-    path('start-video-stream/', views.start_video_stream, name='start_video_stream'),
     
 ]
