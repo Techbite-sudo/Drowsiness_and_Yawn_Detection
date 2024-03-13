@@ -51,7 +51,7 @@
       <div class="collapse navbar-collapse" id="navbarNav">
         <ul class="navbar-nav ml-auto">
           <li class="nav-item">
-            <a class="nav-link" href="#">Logout</a>
+            <a class="nav-link" href="{% url 'logout' %}">Logout</a>
           </li>
         </ul>
       </div>
@@ -166,6 +166,23 @@
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
+      function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+          const cookies = document.cookie.split(';');
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      }
+
+      const csrftoken = getCookie('csrftoken');
+
       function toggleMonitoring(event) {
         // Send an AJAX request to the server to start/stop monitoring
         let monitoringButton = document.getElementById("monitoringButton");
@@ -178,7 +195,7 @@
         fetch("{% url 'toggle_monitoring' %}", {
           method: "POST",
           headers: {
-            "X-CSRFToken": "{{ csrf_token }}",
+            "X-CSRFToken": csrftoken,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({

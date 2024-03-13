@@ -22,6 +22,7 @@ from .models import CustomUser, DriverProfile, Alert, UserSettings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from django.http import HttpResponse
 
 
 def home(request):
@@ -116,7 +117,20 @@ def update_settings(request):
 
     return redirect("driver_dashboard")
 
+@login_required
+def start_video_stream(request):
+    user = request.user
+    webcam_index = 0  # Default webcam index
+    ear_thresh = user.user_settings.ear_threshold
+    ear_frames = user.user_settings.ear_frames
+    yawn_thresh = user.user_settings.yawn_threshold
 
+    try:
+        drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user)
+        return HttpResponse("Video stream started successfully.")
+    except Exception as e:
+        return HttpResponse(f"Error starting video stream: {e}")
+    
 # Global variable to track the monitoring status
 monitoring_thread = None
 
@@ -128,13 +142,12 @@ monitoring_thread = None
 def toggle_monitoring(request):
     global monitoring_thread
 
-    action = request.POST.get("action")
+    action = request.POST.get("action", "").lower()
     user = request.user
 
     if action == "start":
-        if not monitoring_thread or (
-            monitoring_thread and not monitoring_thread.is_alive()
-        ):
+        if not monitoring_thread or (monitoring_thread and not monitoring_thread.is_alive()):
+            print("Creating monitoring thread...")
             webcam_index = 0  # Default webcam index
             ear_thresh = user.user_settings.ear_threshold
             ear_frames = user.user_settings.ear_frames
@@ -152,18 +165,24 @@ def toggle_monitoring(request):
                 daemon=True,
                 on_terminate=safe_stop_monitoring,
             )
-            monitoring_thread.start()
+            try:
+                monitoring_thread.start()
+                print("Monitoring thread started.")
+            except Exception as e:
+                print(f"Error starting monitoring thread: {e}")
 
             message = "Monitoring started successfully."
         else:
+            print("Monitoring thread already exists.")
             message = "Monitoring is already running."
-    else:
+    elif action == "stop":
         if monitoring_thread and monitoring_thread.is_alive():
-            # Safe thread termination using the callback mechanism
             monitoring_thread.raise_exception()  # Signal the thread to stop
             message = "Monitoring stopped successfully."
         else:
             message = "Monitoring is not running."
+    else:
+        message = "Invalid action."
 
     return JsonResponse({"action": action, "message": message})
 
@@ -240,6 +259,7 @@ def lip_distance(shape):
 
 
 def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user):
+    print("Drowsiness detection function called.")
     alarm_status = False
     alarm_status2 = False
     saying = False
@@ -275,13 +295,23 @@ def drowsiness_detection(webcam_index, ear_thresh, ear_frames, yawn_thresh, user
     predictor = dlib.shape_predictor("static/shape_predictor_68_face_landmarks.dat")
 
     print("-> Starting Video Stream")
-    vs = VideoStream(src=webcam_index).start()
+    try:
+        vs = VideoStream(src=webcam_index).start()
+        print("Video stream opened successfully.")
+    except Exception as e:
+        print(f"Error opening video stream: {e}")
+        return  # Exit the function if the video stream cannot be opened
+
     time.sleep(1.0)
 
     COUNTER = 0
 
     while True:
         frame = vs.read()
+        if frame is None:
+            print("Error: No video frame received.")
+            break
+
         frame = imutils.resize(frame, width=450)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
