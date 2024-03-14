@@ -382,7 +382,7 @@ async def drowsiness_detection(
                     t = Thread(target=alarm, args=(msg,))
                     t.daemon = True
                     t.start()
-                    
+
                 cv2.putText(
                     frame,
                     "Yawn Alert",
@@ -430,3 +430,4 @@ async def drowsiness_detection(
 
 
 # http://127.0.0.1:8000/detect_drowsiness/?webcam=0&ear_thresh=0.3&ear_frames=30&yawn_thresh=20
+
