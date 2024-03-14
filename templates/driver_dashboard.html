@@ -75,19 +75,21 @@
           <div class="card">
             <div class="card-body">
               <h5 class="card-title">Alert History</h5>
-              {% if alerts %}
-                {% for alert in alerts %}
-                <div class="alert alert-warning" role="alert">
-                  {{ alert.alert_type }} - {{ alert.timestamp }}
-                  {% if alert.description %}
-                  <br />
-                  {{ alert.description }}
-                  {% endif %}
-                </div>
-                {% endfor %}
-              {% else %}
-                <p>No alerts yet.</p>
-              {% endif %}
+              <div class="alert-history">
+                {% if alerts %}
+                  {% for alert in alerts %}
+                  <div class="alert alert-warning" role="alert">
+                    {{ alert.alert_type }} - {{ alert.timestamp }}
+                    {% if alert.description %}
+                    <br />
+                    {{ alert.description }}
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  <p>No alerts yet.</p>
+                {% endif %}
+              </div>
             </div>
           </div>
         </div>
@@ -166,39 +168,64 @@
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-      const wsUrl = wsProtocol + window.location.host + '/ws/monitoring/';
-      const websocket = new WebSocket(wsUrl);
+      let websocket;
 
-      websocket.onopen = function (event) {
-        console.log('WebSocket connection established.');
-      };
+      function startMonitoring() {
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = wsProtocol + window.location.host + '/ws/monitoring/';
+        websocket = new WebSocket(wsUrl);
 
-      websocket.onmessage = function (event) {
-        const data = JSON.parse(event.data);
-        if (data.action === 'start') {
-          document.getElementById("monitoringButton").textContent = "Stop Monitoring";
-        } else if (data.action === 'stop') {
-          document.getElementById("monitoringButton").textContent = "Start Monitoring";
-        } else if (data.alert_type) {
-          const alertElement = document.createElement('div');
-          alertElement.className = 'alert alert-warning';
-          alertElement.textContent = `${data.alert_type} - ${data.message}`;
-          const alertHistory = document.querySelector('.alert-history');
-          alertHistory.appendChild(alertElement);
+        websocket.onopen = function (event) {
+          console.log('WebSocket connection established.');
+          const action = "start";
+          websocket.send(JSON.stringify({ action: action }));
+        };
+
+        websocket.onmessage = function (event) {
+          const data = JSON.parse(event.data);
+          if (data.action === 'start') {
+            document.getElementById("monitoringButton").textContent = "Stop Monitoring";
+          } else if (data.action === 'stop') {
+            document.getElementById("monitoringButton").textContent = "Start Monitoring";
+          } else if (data.alert_type) {
+            const alertElement = document.createElement('div');
+            alertElement.className = 'alert alert-warning';
+            alertElement.textContent = `${data.alert_type} - ${data.message}`;
+            const alertHistory = document.querySelector('.alert-history');
+            alertHistory.appendChild(alertElement);
+          }
+          alert(data.message);
+        };
+
+        websocket.onerror = function (event) {
+          console.error('WebSocket error:', event);
+        };
+      }
+
+      function stopMonitoring() {
+        if (websocket && websocket.readyState === WebSocket.OPEN) {
+          const action = "stop";
+          websocket.send(JSON.stringify({ action: action }));
+          websocket.close();
+          websocket = null;
         }
-        alert(data.message);
-      };
-    
-      websocket.onerror = function(event) {
-        console.error('WebSocket error:', event);
-      };
-    
+      }
+
       function toggleMonitoring() {
         const button = document.getElementById("monitoringButton");
         const action = button.textContent.toLowerCase().includes("start") ? "start" : "stop";
-        websocket.send(JSON.stringify({ action: action }));
+
+        if (action === "start") {
+          startMonitoring();
+        } else {
+          stopMonitoring();
+        }
+
+        button.textContent = action === "start" ? "Stop Monitoring" : "Start Monitoring";
       }
+
+      const monitoringButton = document.getElementById('monitoringButton');
+      monitoringButton.addEventListener('click', toggleMonitoring);
     </script>
   </body>
 </html>
