@@ -66,20 +66,16 @@ def register_view(request):
 
 @login_required
 def driver_view(request):
-    # user = request.user
-    # driver_profile = DriverProfile.objects.get(user=user)
-    # alerts = Alert.objects.filter(driver=driver_profile)
-    # context = {
-    #     "alerts": alerts,
-    # }
-    context = {
-        "alerts": [
-            "Drowsiness detected at 10:15 AM",
-            "Excessive yawning detected at 11:30 AM",
-        ],
-    }
-    return render(request, "driver_dashboard.html", context)
+    user = request.user
+    driver_profile = DriverProfile.objects.get(user=user)
+    alerts = Alert.objects.filter(driver=driver_profile).order_by('-timestamp')
+    user_settings = UserSettings.objects.get_or_create(user=user)[0]
 
+    context = {
+        'alerts': alerts,
+        'user_settings': user_settings,
+    }
+    return render(request, 'driver_dashboard.html', context)
 
 @login_required
 def driver_dashboard(request):
