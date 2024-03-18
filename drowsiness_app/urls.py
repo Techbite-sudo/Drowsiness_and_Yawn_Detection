@@ -10,6 +10,6 @@ urlpatterns = [
     path("driver_dashboard/", views.driver_view, name="driver_dashboard"),
     path('update-settings/', views.update_settings, name='update_settings'),
     path('toggle-monitoring/', views.toggle_monitoring, name='toggle_monitoring'),
-    path('detect_drowsiness/', views.detect_drowsiness, name='detect_drowsiness'),
+    # path('detect_drowsiness/', views.detect_drowsiness, name='detect_drowsiness'),
     
 ]

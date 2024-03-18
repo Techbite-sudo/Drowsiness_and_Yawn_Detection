@@ -9,15 +9,14 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-import django_compat
-django_compat.patch()
+# import django_compat
+# django_compat.patch()
 import os
 from pathlib import Path
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -27,6 +26,8 @@ SECRET_KEY = "django-insecure-8a+)8%%wiv-@5ysmndvv-f9$tunzeyj1js&d$kyz0p)&yp@v9e
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+
+AUTH_USER_MODEL = 'drowsiness_app.CustomUser'
 
 ALLOWED_HOSTS = []
 
@@ -42,7 +43,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "crispy_forms",
     "channels",
-    'background_task',
+    # 'background_task',
     "drowsiness_app",
 ]
 
@@ -75,9 +76,9 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "drowsiness_project.wsgi.application"
-ASGI_APPLICATION = "drowsiness_project.routing.application"
-BACKGROUND_TASK_RUN_ASYNC = True
-BACKGROUND_TASK_ASYNC_THREADS = 4
+# ASGI_APPLICATION = "drowsiness_project.routing.application"
+ASGI_APPLICATION = 'drowsiness_project.asgi.application'
+
 
 CHANNEL_LAYERS = {
     "default": {
@@ -136,7 +137,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
-AUTH_USER_MODEL = "drowsiness_app.CustomUser"
 LOGIN_URL = "login"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 

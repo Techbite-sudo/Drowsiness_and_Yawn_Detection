@@ -1,7 +1,6 @@
 import datetime
 import os
 from django.http import JsonResponse
-from threading import Thread
 import time
 import cv2
 import imutils
@@ -11,7 +10,9 @@ from scipy.spatial import distance as dist
 import numpy as np
 import dlib
 import pygame.mixer
-
+import asyncio
+from asgiref.sync import async_to_sync
+from .tasks import drowsiness_detection_task
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -23,8 +24,9 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.http import HttpResponse
-import asyncio
-from asgiref.sync import sync_to_async
+
+# Global variable to store the running task
+running_task = None
 
 
 def home(request):
@@ -68,19 +70,7 @@ def register_view(request):
 def driver_view(request):
     user = request.user
     driver_profile = DriverProfile.objects.get(user=user)
-    alerts = Alert.objects.filter(driver=driver_profile).order_by('-timestamp')
-    user_settings = UserSettings.objects.get_or_create(user=user)[0]
-
-    context = {
-        'alerts': alerts,
-        'user_settings': user_settings,
-    }
-    return render(request, 'driver_dashboard.html', context)
-
-@login_required
-def driver_dashboard(request):
-    user = request.user
-    alerts = Alert.objects.filter(user=user).order_by("-timestamp")
+    alerts = Alert.objects.filter(driver=driver_profile).order_by("-timestamp")
     user_settings = UserSettings.objects.get_or_create(user=user)[0]
 
     context = {
@@ -116,94 +106,46 @@ def update_settings(request):
     return redirect("driver_dashboard")
 
 
-# Global variable to track the monitoring status
-monitoring_thread = None
-
-
-# Modify the toggle_monitoring function
 @login_required
-# Remove @csrf_exempt decorator
-@require_POST
+@csrf_exempt
 def toggle_monitoring(request):
-    global monitoring_thread
+    global running_task  # Access the global variable
 
-    action = request.POST.get("action", "").lower()
-    user = request.user
+    if request.method == "POST":
+        action = request.POST.get("action", "").lower()
+        user = request.user
 
-    if action == "start":
-        if not monitoring_thread or (
-            monitoring_thread and not monitoring_thread.is_alive()
-        ):
-            print("Creating monitoring thread...")
+        if action == "start":
             webcam_index = 0  # Default webcam index
             ear_thresh = user.user_settings.ear_threshold
             ear_frames = user.user_settings.ear_frames
             yawn_thresh = user.user_settings.yawn_threshold
 
-            def safe_stop_monitoring():
-                global monitoring_thread
-                if monitoring_thread:
-                    monitoring_thread.join()  # Wait for the thread to finish
-                    monitoring_thread = None
-
-            monitoring_thread = Thread(
-                target=drowsiness_detection,
-                args=(webcam_index, ear_thresh, ear_frames, yawn_thresh, user),
-                daemon=True,
-                on_terminate=safe_stop_monitoring,
+            # Start the real-time drowsiness detection process asynchronously
+            running_task = asyncio.create_task(
+                drowsiness_detection_task(
+                    webcam_index, ear_thresh, ear_frames, yawn_thresh, user
+                )
             )
-            try:
-                monitoring_thread.start()
-                print("Monitoring thread started.")
-            except Exception as e:
-                print(f"Error starting monitoring thread: {e}")
 
-            message = "Monitoring started successfully."
-        else:
-            print("Monitoring thread already exists.")
-            message = "Monitoring is already running."
-    elif action == "stop":
-        if monitoring_thread and monitoring_thread.is_alive():
-            monitoring_thread.raise_exception()  # Signal the thread to stop
-            message = "Monitoring stopped successfully."
-        else:
-            message = "Monitoring is not running."
-    else:
-        message = "Invalid action."
-
-    return JsonResponse({"action": action, "message": message})
+            return JsonResponse(
+                {"action": action, "message": "Monitoring started successfully."}
+            )
+        elif action == "stop":
+            # Stop the drowsiness detection process
+            if running_task is not None:
+                running_task.cancel()
+                running_task = None
+            return JsonResponse(
+                {"action": action, "message": "Monitoring stopped successfully."}
+            )
+    return JsonResponse({"message": "Invalid request method."})
 
 
 def logout_view(request):
     logout(request)
     messages.success(request, "Logout successful!")
     return redirect("home")
-
-
-# You can implement the detect_drowsiness view here
-def detect_drowsiness(request):
-    user = request.user
-    user_settings = UserSettings.objects.get_or_create(user=user)[0]
-
-    webcam_index = 0  # Default webcam index
-    ear_thresh = user_settings.ear_threshold
-    ear_frames = user_settings.ear_frames
-    yawn_thresh = user_settings.yawn_threshold
-
-    drowsiness_thread = Thread(
-        target=drowsiness_detection,
-        args=(webcam_index, ear_thresh, ear_frames, yawn_thresh, user),
-    )
-    drowsiness_thread.daemon = True
-    drowsiness_thread.start()
-
-    return redirect("driver_dashboard")
-
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-alarm_status = False
-alarm_status2 = False
-saying = False
 
 
 def eye_aspect_ratio(eye):
@@ -243,187 +185,3 @@ def lip_distance(shape):
 
     distance = abs(top_mean[1] - low_mean[1])
     return distance
-
-
-async def drowsiness_detection(
-    webcam_index, ear_thresh, ear_frames, yawn_thresh, user, channel_layer
-):
-    print("Drowsiness detection function called.")
-    alarm_status = False
-    alarm_status2 = False
-    saying = False
-
-    pygame.mixer.init()
-    pygame.mixer.music.load(os.path.join(BASE_DIR, "static/music.wav"))
-
-    async def send_alert(msg, alert_type):
-        alert = Alert(user=user, alert_type=alert_type, description=msg)
-        await sync_to_async(alert.save, thread_sensitive=True)()
-        await channel_layer.group_send(
-            f"user_{user.id}",
-            {
-                "type": "send_message",
-                "message": msg,
-                "alert_type": alert_type,
-            },
-        )
-
-    def alarm(msg):
-        nonlocal alarm_status, alarm_status2, saying
-
-        while alarm_status:
-            print("Playing audio alert...")
-            pygame.mixer.music.play()
-            print("call")
-            s = 'espeak "' + msg + '"'
-            os.system(s)
-
-        if alarm_status2:
-            print("Playing audio alert...")
-            pygame.mixer.music.play()
-            print("call")
-            saying = True
-            s = 'espeak "' + msg + '"'
-            os.system(s)
-            saying = False
-
-        # Create an alert instance and save it to the database
-        alert = Alert(user=user, alert_type="drowsiness", description=msg)
-        alert.save()
-
-    print("-> Loading the predictor and detector...")
-    detector = cv2.CascadeClassifier("static/haarcascade_frontalface_default.xml")
-    predictor = dlib.shape_predictor("static/shape_predictor_68_face_landmarks.dat")
-
-    print("-> Starting Video Stream")
-    try:
-        vs = VideoStream(src=webcam_index).start()
-        print("Video stream opened successfully.")
-    except Exception as e:
-        print(f"Error opening video stream: {e}")
-        return  # Exit the function if the video stream cannot be opened
-
-    time.sleep(1.0)
-
-    COUNTER = 0
-
-    while True:
-        frame = vs.read()
-        if frame is None:
-            print("Error: No video frame received.")
-            break
-
-        frame = imutils.resize(frame, width=450)
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        rects = detector.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30),
-            flags=cv2.CASCADE_SCALE_IMAGE,
-        )
-
-        for x, y, w, h in rects:
-            rect = dlib.rectangle(int(x), int(y), int(x + w), int(y + h))
-
-            shape = predictor(gray, rect)
-            shape = face_utils.shape_to_np(shape)
-
-            eye = final_ear(shape)
-            ear = eye[0]
-            leftEye = eye[1]
-            rightEye = eye[2]
-
-            distance = lip_distance(shape)
-
-            leftEyeHull = cv2.convexHull(leftEye)
-            rightEyeHull = cv2.convexHull(rightEye)
-            cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
-            cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
-
-            lip = shape[48:60]
-            cv2.drawContours(frame, [lip], -1, (0, 255, 0), 1)
-
-            if ear < ear_thresh:
-                COUNTER += 1
-
-                if COUNTER >= ear_frames:
-                    if not alarm_status:
-                        alarm_status = True
-                        msg = "Drowsiness detected!"
-                        await send_alert(msg, "drowsiness")
-                        t = Thread(target=alarm, args=(msg,))
-                        t.daemon = True
-                        t.start()
-
-                    cv2.putText(
-                        frame,
-                        "DROWSINESS ALERT!",
-                        (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.7,
-                        (0, 0, 255),
-                        2,
-                    )
-            else:
-                COUNTER = 0
-                alarm_status = False
-
-            if distance > yawn_thresh:
-                msg = "Yawn Alert"
-                await send_alert(msg, "yawning")
-                if not alarm_status2 and not saying:
-                    alarm_status2 = True
-                    t = Thread(target=alarm, args=(msg,))
-                    t.daemon = True
-                    t.start()
-
-                cv2.putText(
-                    frame,
-                    "Yawn Alert",
-                    (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 0, 255),
-                    2,
-                )
-                if not alarm_status2 and not saying:
-                    alarm_status2 = True
-                    t = Thread(target=alarm, args=("take some fresh air sir",))
-                    t.daemon = True
-                    t.start()
-            else:
-                alarm_status2 = False
-
-            cv2.putText(
-                frame,
-                "EAR: {:.2f}".format(ear),
-                (300, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 0, 255),
-                2,
-            )
-            cv2.putText(
-                frame,
-                "YAWN: {:.2f}".format(distance),
-                (300, 60),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.7,
-                (0, 0, 255),
-                2,
-            )
-
-        cv2.imshow("Frame", frame)
-        key = cv2.waitKey(1) & 0xFF
-
-        if key == ord("q"):
-            break
-
-    cv2.destroyAllWindows()
-    vs.stop()
-
-
-# http://127.0.0.1:8000/detect_drowsiness/?webcam=0&ear_thresh=0.3&ear_frames=30&yawn_thresh=20
-

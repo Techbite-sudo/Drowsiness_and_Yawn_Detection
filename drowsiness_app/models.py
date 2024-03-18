@@ -29,7 +29,8 @@ class CustomUser(AbstractUser):
 
 class DriverProfile(models.Model):
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
+        # settings.AUTH_USER_MODEL,
+        CustomUser,
         on_delete=models.CASCADE,
         related_name="driver_profile",
     )
@@ -61,7 +62,8 @@ class Alert(models.Model):
 
 class UserSettings(models.Model):
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL,
+        # settings.AUTH_USER_MODEL,
+        CustomUser,
         on_delete=models.CASCADE,
         related_name="user_settings",
     )
@@ -80,3 +82,4 @@ class UserSettings(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Settings"
+
