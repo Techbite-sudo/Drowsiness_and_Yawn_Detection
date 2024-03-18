@@ -10,6 +10,7 @@ from scipy.spatial import distance as dist
 import numpy as np
 import dlib
 import pygame.mixer
+
 import asyncio
 from asgiref.sync import async_to_sync
 from .tasks import drowsiness_detection_task
@@ -39,12 +40,12 @@ def home(request):
 
 def login_view(request):
     if request.method == "POST":
-        username = request.POST.get("email")  # Use the email as the username
+        email = request.POST.get("email")
         password = request.POST.get("password")
-        user = authenticate(request, username=username, password=password)
+        user = authenticate(request, username=email, password=password)
         if user is not None:
             login(request, user)
-            return redirect("driver_view")
+            return redirect("driver_dashboard")
         else:
             messages.error(request, "Invalid email or password.")
     return render(request, "login.html")
@@ -57,18 +58,28 @@ def register_view(request):
             user = form.save()
             email = form.cleaned_data.get("email")
             password = form.cleaned_data.get("password1")
-            user = authenticate(request, username=email, password=password)
-            login(request, user)
-            DriverProfile.objects.create(user=user)
-            return redirect("driver_view")
+
+            # Authenticate the user
+            authenticated_user = authenticate(username=email, password=password)
+
+            # Log the user in
+            if authenticated_user is not None:
+                login(request, authenticated_user)
+                DriverProfile.objects.create(user=user)
+                return redirect("driver_dashboard")
+            else:
+                # Handle authentication failure
+                pass
     else:
         form = CustomUserCreationForm()
+
     return render(request, "register.html", {"form": form})
 
 
 @login_required
 def driver_view(request):
     user = request.user
+    print("@@@@@@@@@@@@@@@",user)
     driver_profile = DriverProfile.objects.get(user=user)
     alerts = Alert.objects.filter(driver=driver_profile).order_by("-timestamp")
     user_settings = UserSettings.objects.get_or_create(user=user)[0]
@@ -109,8 +120,6 @@ def update_settings(request):
 @login_required
 @csrf_exempt
 def toggle_monitoring(request):
-    global running_task  # Access the global variable
-
     if request.method == "POST":
         action = request.POST.get("action", "").lower()
         user = request.user
@@ -121,21 +130,28 @@ def toggle_monitoring(request):
             ear_frames = user.user_settings.ear_frames
             yawn_thresh = user.user_settings.yawn_threshold
 
-            # Start the real-time drowsiness detection process asynchronously
-            running_task = asyncio.create_task(
-                drowsiness_detection_task(
+            # Create a new event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                # Start the real-time drowsiness detection process asynchronously
+                running_task = async_to_sync(drowsiness_detection_task)(
                     webcam_index, ear_thresh, ear_frames, yawn_thresh, user
                 )
-            )
+                request.session['running_task'] = running_task
+            finally:
+                loop.close()
 
             return JsonResponse(
                 {"action": action, "message": "Monitoring started successfully."}
             )
         elif action == "stop":
             # Stop the drowsiness detection process
+            running_task = request.session.get('running_task')
             if running_task is not None:
-                running_task.cancel()
-                running_task = None
+                async_to_sync(running_task.cancel)()
+                del request.session['running_task']
             return JsonResponse(
                 {"action": action, "message": "Monitoring stopped successfully."}
             )
@@ -147,41 +163,3 @@ def logout_view(request):
     messages.success(request, "Logout successful!")
     return redirect("home")
 
-
-def eye_aspect_ratio(eye):
-    A = dist.euclidean(eye[1], eye[5])
-    B = dist.euclidean(eye[2], eye[4])
-
-    C = dist.euclidean(eye[0], eye[3])
-
-    ear = (A + B) / (2.0 * C)
-
-    return ear
-
-
-def final_ear(shape):
-    (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
-    (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
-
-    leftEye = shape[lStart:lEnd]
-    rightEye = shape[rStart:rEnd]
-
-    leftEAR = eye_aspect_ratio(leftEye)
-    rightEAR = eye_aspect_ratio(rightEye)
-
-    ear = (leftEAR + rightEAR) / 2.0
-    return (ear, leftEye, rightEye)
-
-
-def lip_distance(shape):
-    top_lip = shape[50:53]
-    top_lip = np.concatenate((top_lip, shape[61:64]))
-
-    low_lip = shape[56:59]
-    low_lip = np.concatenate((low_lip, shape[65:68]))
-
-    top_mean = np.mean(top_lip, axis=0)
-    low_mean = np.mean(low_lip, axis=0)
-
-    distance = abs(top_mean[1] - low_mean[1])
-    return distance
