@@ -86,7 +86,7 @@ def driver_view(request):
     driver_profile = DriverProfile.objects.get(user=user)
     alerts = Alert.objects.filter(driver=driver_profile).order_by("-timestamp")
     user_settings = UserSettings.objects.get_or_create(user=user)[0]
-
+    print("👩",user)
     context = {
         "alerts": alerts,
         "user_settings": user_settings,

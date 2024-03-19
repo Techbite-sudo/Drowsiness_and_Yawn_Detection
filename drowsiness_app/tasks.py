@@ -7,8 +7,10 @@ import pygame.mixer
 from imutils import face_utils
 from imutils.video import VideoStream
 from scipy.spatial import distance as dist
-from .models import Alert
+from .models import Alert, DriverProfile
 import numpy as np
+from asgiref.sync import sync_to_async
+
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -58,32 +60,10 @@ async def drowsiness_detection_task(
     alarm_status = False
     alarm_status2 = False
     saying = False
+    drowsiness_detected = False
 
     pygame.mixer.init()
     pygame.mixer.music.load(os.path.join(BASE_DIR, "static/music.wav"))
-
-    def alarm(msg):
-        nonlocal alarm_status, alarm_status2, saying
-
-        while alarm_status:
-            print("Playing audio alert...")
-            pygame.mixer.music.play()
-            print("call")
-            s = 'espeak "' + msg + '"'
-            os.system(s)
-
-        if alarm_status2:
-            print("Playing audio alert...")
-            pygame.mixer.music.play()
-            print("call")
-            saying = True
-            s = 'espeak "' + msg + '"'
-            os.system(s)
-            saying = False
-
-        # Create an alert instance and save it to the database
-        alert = Alert(user=user, alert_type="drowsiness", description=msg)
-        alert.save()
 
     print("-> Loading the predictor and detector...")
     detector = cv2.CascadeClassifier("static/haarcascade_frontalface_default.xml")
@@ -143,10 +123,19 @@ async def drowsiness_detection_task(
                 COUNTER += 1
 
                 if COUNTER >= ear_frames:
-                    if not alarm_status:
-                        alarm_status = True
+                    if not drowsiness_detected:
+                        drowsiness_detected = True
                         msg = "Drowsiness detected!"
-                        alarm(msg)
+                        print("Playing audio alert...")
+                        pygame.mixer.music.play()
+                        print("call")
+                        s = 'espeak "' + msg + '"'
+                        await sync_to_async(os.system)(s)
+
+                        # Create an alert instance and save it to the database
+                        driver_profile = await sync_to_async(DriverProfile.objects.get, thread_sensitive=True)(user=user)
+                        alert = Alert(driver=driver_profile, alert_type="drowsiness", description=msg)
+                        await sync_to_async(alert.save, thread_sensitive=True)()
 
                     cv2.putText(
                         frame,
@@ -159,13 +148,25 @@ async def drowsiness_detection_task(
                     )
             else:
                 COUNTER = 0
-                alarm_status = False
+                drowsiness_detected = False
 
             if distance > yawn_thresh:
                 msg = "Yawn Alert"
                 if not alarm_status2 and not saying:
                     alarm_status2 = True
-                    alarm(msg)
+                    print("Playing audio alert...")
+                    pygame.mixer.music.play()
+                    print("call")
+                    saying = True
+                    s = 'espeak "' + msg + '"'
+                    await sync_to_async(os.system)(s)
+                    saying = False
+                    alarm_status2 = False  # Reset the alarm_status2 flag
+
+                    # Create an alert instance and save it to the database
+                    driver_profile = await sync_to_async(DriverProfile.objects.get, thread_sensitive=True)(user=user)
+                    alert = Alert(driver=driver_profile, alert_type="yawning", description=msg)
+                    await sync_to_async(alert.save, thread_sensitive=True)()
 
                 cv2.putText(
                     frame,
