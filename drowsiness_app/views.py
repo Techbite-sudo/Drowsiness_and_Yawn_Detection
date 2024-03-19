@@ -59,7 +59,6 @@ def register_view(request):
             user = form.save()
             email = form.cleaned_data.get("email")
             password = form.cleaned_data.get("password1")
-            print("reggggggggggg",email, password)
             # Authenticate the user
             authenticated_user = authenticate(username=email, password=password)
 
@@ -84,7 +83,6 @@ def register_view(request):
 @login_required
 def driver_view(request):
     user = request.user
-    print("@@@@@@@@@@@@@@@",user)
     driver_profile = DriverProfile.objects.get(user=user)
     alerts = Alert.objects.filter(driver=driver_profile).order_by("-timestamp")
     user_settings = UserSettings.objects.get_or_create(user=user)[0]
