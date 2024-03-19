@@ -116,6 +116,22 @@ def update_settings(request):
 
     return redirect("driver_dashboard")
 
+@login_required
+def update_profile(request):
+    if request.method == "POST":
+        user = request.user
+        driver_profile = DriverProfile.objects.get(user=user)
+
+        license_number = request.POST.get("license_number")
+        phone_number = request.POST.get("phone_number")
+
+        driver_profile.license_number = license_number
+        driver_profile.phone_number = phone_number
+        driver_profile.save()
+
+        return redirect("driver_dashboard")
+
+    return redirect("driver_dashboard")
 
 @login_required
 @csrf_exempt

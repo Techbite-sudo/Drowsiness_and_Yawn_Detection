@@ -4,10 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Drowsiness and Yawn Detection System</title>
-    <link
-      rel="stylesheet"
-      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
-    />
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
     <style>
       body {
         background-color: #f8f9fa;
@@ -30,6 +27,14 @@
       }
       .alert {
         border-radius: 10px;
+      }
+      .form-group label {
+        font-weight: bold;
+      }
+      @media (max-width: 767px) {
+        .card {
+          margin-bottom: 1rem;
+        }
       }
     </style>
   </head>
@@ -64,30 +69,24 @@
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title">Dashboard</h5>
-              <p class="card-text">
-                System Status: <span class="badge badge-success">Active</span>
-              </p>
+              <p class="card-text">System Status: <span class="badge badge-success">Active</span></p>
               <button id="monitoringButton" class="btn btn-primary">Start Monitoring</button>
             </div>
           </div>
 
           <!-- Alert History -->
-          <div class="card">
+          <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title">Alert History</h5>
               <div class="alert-history">
-                {% if alerts %}
-                  {% for alert in alerts %}
-                  <div class="alert alert-warning" role="alert">
-                    {{ alert.alert_type }} - {{ alert.timestamp }}
-                    {% if alert.description %}
-                    <br />
-                    {{ alert.description }}
-                    {% endif %}
-                  </div>
-                  {% endfor %}
-                {% else %}
-                  <p>No alerts yet.</p>
+                {% if alerts %} {% for alert in alerts %}
+                <div class="alert alert-warning" role="alert">
+                  {{ alert.alert_type }} - {{ alert.timestamp }} {% if alert.description %}
+                  <br />
+                  {{ alert.description }} {% endif %}
+                </div>
+                {% endfor %} {% else %}
+                <p>No alerts yet.</p>
                 {% endif %}
               </div>
             </div>
@@ -99,14 +98,12 @@
           <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title">Notifications</h5>
-              <div class="alert alert-danger" role="alert">
-                Drowsiness detected! Take a break.
-              </div>
+              <div class="alert alert-danger" role="alert">Drowsiness detected! Take a break.</div>
             </div>
           </div>
 
           <!-- Settings -->
-          <div class="card">
+          <div class="card mb-4">
             <div class="card-body">
               <h5 class="card-title">Settings</h5>
               <form method="post" action="{% url 'update_settings' %}">
@@ -160,6 +157,39 @@
               </form>
             </div>
           </div>
+
+          <!-- Update Profile -->
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Update Profile</h5>
+              <form method="post" action="{% url 'update_profile' %}">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="licenseNumber">License Number</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="licenseNumber"
+                    name="license_number"
+                    required
+                    value="{{ driver_profile.license_number }}"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="phoneNumber">Phone Number</label>
+                  <input
+                    type="tel"
+                    class="form-control"
+                    id="phoneNumber"
+                    name="phone_number"
+                    required
+                    value="{{ driver_profile.phone_number }}"
+                  />
+                </div>
+                <button type="submit" class="btn btn-primary">Update Profile</button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -169,16 +199,16 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
       let monitoringWebSocket;
-    
+
       function startMonitoring() {
         const wsProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         const wsUrl = wsProtocol + window.location.host + '/ws/monitoring/';
         monitoringWebSocket = new WebSocket(wsUrl);
-    
+
         monitoringWebSocket.onopen = function (event) {
           console.log('WebSocket connection established.');
         };
-    
+
         monitoringWebSocket.onmessage = function (event) {
           const data = JSON.parse(event.data);
           if (data.alert_type) {
@@ -189,23 +219,23 @@
             alertHistory.appendChild(alertElement);
           }
         };
-    
+
         monitoringWebSocket.onerror = function (event) {
           console.error('WebSocket error:', event);
         };
       }
-    
+
       function stopMonitoring() {
         if (monitoringWebSocket && monitoringWebSocket.readyState === WebSocket.OPEN) {
           monitoringWebSocket.close();
           monitoringWebSocket = null;
         }
       }
-    
+
       function toggleMonitoring() {
         const button = document.getElementById('monitoringButton');
         const action = button.textContent.toLowerCase().includes('start') ? 'start' : 'stop';
-    
+
         if (action === 'start') {
           startMonitoring();
           sendMonitoringAction(action);
@@ -213,10 +243,10 @@
           stopMonitoring();
           sendMonitoringAction(action);
         }
-    
+
         button.textContent = action === 'start' ? 'Stop Monitoring' : 'Start Monitoring';
       }
-    
+
       function sendMonitoringAction(action) {
         fetch('{% url 'toggle_monitoring' %}', {
           method: 'POST',
@@ -234,9 +264,9 @@
             console.error('Error:', error);
           });
       }
-    
+
       const monitoringButton = document.getElementById('monitoringButton');
       monitoringButton.addEventListener('click', toggleMonitoring);
     </script>
   </body>
-</html> 
+</html>
