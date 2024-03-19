@@ -40,11 +40,12 @@ def home(request):
 
 def login_view(request):
     if request.method == "POST":
-        email = request.POST.get("email")
+        email = request.POST.get("username")
         password = request.POST.get("password")
         user = authenticate(request, username=email, password=password)
         if user is not None:
             login(request, user)
+            messages.error(request, "Log in Successfull!!.")
             return redirect("driver_dashboard")
         else:
             messages.error(request, "Invalid email or password.")
@@ -58,18 +59,22 @@ def register_view(request):
             user = form.save()
             email = form.cleaned_data.get("email")
             password = form.cleaned_data.get("password1")
-
+            print("reggggggggggg",email, password)
             # Authenticate the user
             authenticated_user = authenticate(username=email, password=password)
 
             # Log the user in
             if authenticated_user is not None:
                 login(request, authenticated_user)
-                DriverProfile.objects.create(user=user)
+                # Create a default DriverProfile instance
+                driver_profile = DriverProfile.objects.create(
+                    user=authenticated_user,
+                    license_number='KBY 127W',
+                    phone_number='0712345678'
+                )
                 return redirect("driver_dashboard")
             else:
-                # Handle authentication failure
-                pass
+                messages.error(request, "Authentication failed!!.")
     else:
         form = CustomUserCreationForm()
 
