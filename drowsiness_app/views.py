@@ -22,7 +22,7 @@ from django.shortcuts import render, redirect
 from .forms import CustomUserCreationForm
 from .models import CustomUser, DriverProfile, Alert, UserSettings
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.views.decorators.http import require_POST
 from django.http import HttpResponse
 
@@ -39,45 +39,49 @@ def home(request):
 
 
 def login_view(request):
-    if request.method == "POST":
-        email = request.POST.get("username")
-        password = request.POST.get("password")
+    if request.user.is_authenticated:
+        return redirect('driver_dashboard')
+
+    if request.method == 'POST':
+        email = request.POST.get('username')
+        password = request.POST.get('password')
         user = authenticate(request, username=email, password=password)
         if user is not None:
             login(request, user)
-            messages.error(request, "Log in Successfull!!.")
-            return redirect("driver_dashboard")
+            messages.success(request, 'Login successful!')
+            return redirect('driver_dashboard')
         else:
-            messages.error(request, "Invalid email or password.")
-    return render(request, "login.html")
+            messages.error(request, 'Invalid email or password.')
 
+    return render(request, 'login.html')
 
 def register_view(request):
-    if request.method == "POST":
+    if request.user.is_authenticated:
+        return redirect('driver_dashboard')
+
+    if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             user = form.save()
-            email = form.cleaned_data.get("email")
-            password = form.cleaned_data.get("password1")
-            # Authenticate the user
+            email = form.cleaned_data.get('email')
+            password = form.cleaned_data.get('password1')
             authenticated_user = authenticate(username=email, password=password)
 
-            # Log the user in
             if authenticated_user is not None:
                 login(request, authenticated_user)
-                # Create a default DriverProfile instance
+                messages.success(request, 'Registration successful!')
                 driver_profile = DriverProfile.objects.create(
                     user=authenticated_user,
                     license_number='KBY 127W',
                     phone_number='0712345678'
                 )
-                return redirect("driver_dashboard")
+                return redirect('driver_dashboard')
             else:
-                messages.error(request, "Authentication failed!!.")
+                messages.error(request, 'Authentication failed!')
     else:
         form = CustomUserCreationForm()
 
-    return render(request, "register.html", {"form": form})
+    return render(request, 'register.html', {'form': form})
 
 
 @login_required
@@ -95,6 +99,7 @@ def driver_view(request):
 
 
 @login_required
+@csrf_protect
 def update_settings(request):
     if request.method == "POST":
         user = request.user
@@ -120,6 +125,7 @@ def update_settings(request):
     return redirect("driver_dashboard")
 
 @login_required
+@csrf_protect
 def update_profile(request):
     if request.method == "POST":
         user = request.user
