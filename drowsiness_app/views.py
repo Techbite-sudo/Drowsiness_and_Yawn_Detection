@@ -155,6 +155,10 @@ def toggle_monitoring(request):
             ear_frames = user.user_settings.ear_frames
             yawn_thresh = user.user_settings.yawn_threshold
 
+             # Retrieve driver_profile and driver_email synchronously
+            driver_profile = DriverProfile.objects.get(user=user)
+            driver_email = driver_profile.user.email
+            
             # Create a new event loop
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -162,7 +166,7 @@ def toggle_monitoring(request):
             try:
                 # Start the real-time drowsiness detection process asynchronously
                 running_task = async_to_sync(drowsiness_detection_task)(
-                    webcam_index, ear_thresh, ear_frames, yawn_thresh, user
+                    webcam_index, ear_thresh, ear_frames, yawn_thresh, driver_profile, driver_email
                 )
                 request.session['running_task'] = running_task
             finally:

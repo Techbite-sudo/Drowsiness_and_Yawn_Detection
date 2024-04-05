@@ -10,10 +10,12 @@ from scipy.spatial import distance as dist
 from .models import Alert, DriverProfile
 import numpy as np
 from asgiref.sync import sync_to_async
-
+from django.core.mail import EmailMessage
+from django.template.loader import render_to_string
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def eye_aspect_ratio(eye):
     A = dist.euclidean(eye[1], eye[5])
@@ -53,8 +55,9 @@ def lip_distance(shape):
     distance = abs(top_mean[1] - low_mean[1])
     return distance
 
+
 async def drowsiness_detection_task(
-    webcam_index, ear_thresh, ear_frames, yawn_thresh, user
+    webcam_index, ear_thresh, ear_frames, yawn_thresh, driver_profile, driver_email
 ):
     print("Drowsiness detection task started.")
     alarm_status = False
@@ -132,10 +135,25 @@ async def drowsiness_detection_task(
                         s = 'espeak "' + msg + '"'
                         await sync_to_async(os.system)(s)
 
-                        # Create an alert instance and save it to the database
-                        driver_profile = await sync_to_async(DriverProfile.objects.get, thread_sensitive=True)(user=user)
-                        alert = Alert(driver=driver_profile, alert_type="drowsiness", description=msg)
+                        alert = Alert(
+                            driver=driver_profile,
+                            alert_type="drowsiness",
+                            description=msg,
+                        )
                         await sync_to_async(alert.save, thread_sensitive=True)()
+
+                        if alert.alert_type == "drowsiness":
+                            subject = "Drowsiness Alert"
+                            email_template = "drowsiness_alert.html"
+                            context = {
+                                "driver": driver_profile,
+                                "alert": alert,
+                                "driver_first_name": driver_profile.user.first_name,
+                            }
+                            message = render_to_string(email_template, context)
+                            email = EmailMessage(subject, message, to=[driver_email])
+                            email.content_subtype = "html"
+                            email.send()
 
                     cv2.putText(
                         frame,
@@ -163,9 +181,9 @@ async def drowsiness_detection_task(
                     saying = False
                     alarm_status2 = False  # Reset the alarm_status2 flag
 
-                    # Create an alert instance and save it to the database
-                    driver_profile = await sync_to_async(DriverProfile.objects.get, thread_sensitive=True)(user=user)
-                    alert = Alert(driver=driver_profile, alert_type="yawning", description=msg)
+                    alert = Alert(
+                        driver=driver_profile, alert_type="yawning", description=msg
+                    )
                     await sync_to_async(alert.save, thread_sensitive=True)()
 
                 cv2.putText(

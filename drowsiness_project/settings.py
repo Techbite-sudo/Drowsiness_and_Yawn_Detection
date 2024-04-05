@@ -9,8 +9,7 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-# import django_compat
-# django_compat.patch()
+
 import os
 from pathlib import Path
 
@@ -31,6 +30,13 @@ AUTH_USER_MODEL = 'drowsiness_app.CustomUser'
 
 ALLOWED_HOSTS = []
 
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'bonfacemwema7@gmail.com'
+EMAIL_HOST_PASSWORD = 'otoj mxkl ibbb bwfd'
+
 
 # Application definition
 
@@ -43,7 +49,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "crispy_forms",
     "channels",
-    # 'background_task',
     "drowsiness_app",
 ]
 
@@ -76,7 +81,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "drowsiness_project.wsgi.application"
-# ASGI_APPLICATION = "drowsiness_project.routing.application"
 ASGI_APPLICATION = 'drowsiness_project.asgi.application'
 
 
@@ -129,6 +133,8 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 
 USE_I18N = True
+
+USE_L10N = True
 
 USE_TZ = True
 
